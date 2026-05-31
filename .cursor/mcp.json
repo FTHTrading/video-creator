@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "comfyui": {
+      "command": "python",
+      "args": ["-m", "mcp_server.server"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "COMFY_HOST": "127.0.0.1",
+        "COMFY_PORT": "8188",
+        "COMFY_JOB_TIMEOUT": "300",
+        "COMFY_DEFAULT_CHECKPOINT": "v1-5-pruned-emaonly.ckpt",
+        "COMFY_UPSCALE_MODEL": "RealESRGAN_x4plus.pth",
+        "COMFY_WORKFLOWS_DIR": "${workspaceFolder}/mcp_server/saved_workflows"
+      }
+    }
+  }
+}
