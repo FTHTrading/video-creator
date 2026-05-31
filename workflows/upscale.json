@@ -1,0 +1,42 @@
+{
+  "__params__": {
+    "image":         { "node": "1",  "field": "image" },
+    "upscale_model": { "node": "2",  "field": "model_name" },
+    "scale_by":      { "node": "4",  "field": "scale_by" }
+  },
+
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "input.png"
+    }
+  },
+  "2": {
+    "class_type": "UpscaleModelLoader",
+    "inputs": {
+      "model_name": "RealESRGAN_x4plus.pth"
+    }
+  },
+  "3": {
+    "class_type": "ImageUpscaleWithModel",
+    "inputs": {
+      "upscale_model": ["2", 0],
+      "image":         ["1", 0]
+    }
+  },
+  "4": {
+    "class_type": "ImageScaleBy",
+    "inputs": {
+      "image":          ["3", 0],
+      "upscale_method": "lanczos",
+      "scale_by": 1.0
+    }
+  },
+  "5": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "comfy_upscale",
+      "images": ["4", 0]
+    }
+  }
+}

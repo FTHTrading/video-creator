@@ -1,16 +1,36 @@
 # video-creator
 
-A ComfyUI MCP server that exposes image generation, editing, and upscaling as
-tools callable from Cursor's agent (Composer).
+ComfyUI MCP server for Cursor. Exposes image-generation and editing as
+structured tools that the Cursor agent can call from natural language.
 
 ```
-Cursor agent
+Cursor Agent
     │  MCP tool call
     ▼
-mcp_server/server.py   ← this repo
+server/comfy_mcp_server.py
     │  HTTP + WebSocket
     ▼
-ComfyUI  (running locally on port 8188)
+ComfyUI  (running locally on :8188)
+```
+
+---
+
+## Repository layout
+
+```
+workflows/
+  txt2img.json        ComfyUI API-format template  — text-to-image
+  img2img.json        ComfyUI API-format template  — image editing
+  upscale.json        ComfyUI API-format template  — ESRGAN upscaling
+
+server/
+  comfy_client.py     Template loader, param injector, HTTP + WebSocket client
+  comfy_mcp_server.py FastMCP server — run this file to start the MCP server
+
+test_comfy.py         Standalone connection test (run before connecting Cursor)
+
+.cursor/mcp.json      Cursor MCP config — auto-loaded when workspace is opened
+requirements.txt      Python dependencies
 ```
 
 ---
@@ -20,10 +40,9 @@ ComfyUI  (running locally on port 8188)
 ### 1. Prerequisites
 
 - Python 3.11+
-- A running [ComfyUI](https://github.com/comfyanonymous/ComfyUI) instance
-  (defaults to `http://127.0.0.1:8188`)
-- At least one checkpoint model in ComfyUI's `models/checkpoints/` folder
-- *(Optional)* `RealESRGAN_x4plus.pth` in `models/upscale_models/` for upscaling
+- ComfyUI running locally on port 8188
+- At least one checkpoint model in `ComfyUI/models/checkpoints/`
+- `RealESRGAN_x4plus.pth` in `ComfyUI/models/upscale_models/` (for upscaling)
 
 ### 2. Install dependencies
 
@@ -31,34 +50,37 @@ ComfyUI  (running locally on port 8188)
 pip install -r requirements.txt
 ```
 
-### 3. Configure environment variables
+### 3. Test the connection (do this first)
 
-The server is configured via environment variables (all optional — defaults work
-for a standard local ComfyUI install):
+Before touching Cursor, verify the full chain works:
 
-| Variable | Default | Description |
-|---|---|---|
-| `COMFY_HOST` | `127.0.0.1` | ComfyUI host |
-| `COMFY_PORT` | `8188` | ComfyUI port |
-| `COMFY_JOB_TIMEOUT` | `300` | Seconds before a queued job times out |
-| `COMFY_DEFAULT_CHECKPOINT` | `v1-5-pruned-emaonly.ckpt` | Default checkpoint model |
-| `COMFY_UPSCALE_MODEL` | `RealESRGAN_x4plus.pth` | Default ESRGAN upscale model |
-| `COMFY_WORKFLOWS_DIR` | `mcp_server/saved_workflows/` | Folder for named workflow JSON files |
+```bash
+# Connection + template checks only (no GPU usage)
+python test_comfy.py
 
-### 4. Add to Cursor
+# Also submit a real txt2img job
+python test_comfy.py --live
 
-The `.cursor/mcp.json` file in this repo is pre-configured. Cursor will pick it
-up automatically when you open this folder as a workspace.
+# Custom prompt for the live test
+python test_comfy.py --live --prompt "a red apple on a white table"
+```
 
-Alternatively, add the server manually via **Cursor Settings → MCP**:
+Fix any errors the test reports before proceeding to step 4.
+
+### 4. Connect Cursor
+
+`.cursor/mcp.json` is already present. Cursor picks it up automatically
+when this folder is opened as a workspace. No manual settings step needed.
+
+To point it at a non-default ComfyUI host, edit the `env` block:
 
 ```json
 {
   "mcpServers": {
-    "comfyui": {
+    "comfy-local": {
       "command": "python",
-      "args": ["-m", "mcp_server.server"],
-      "cwd": "/path/to/video-creator",
+      "args": ["server/comfy_mcp_server.py"],
+      "cwd": "/absolute/path/to/video-creator",
       "env": {
         "COMFY_HOST": "127.0.0.1",
         "COMFY_PORT": "8188"
@@ -68,18 +90,17 @@ Alternatively, add the server manually via **Cursor Settings → MCP**:
 }
 ```
 
-### 5. Use from Cursor agent
+### 5. Use from Cursor Composer
 
-Once the MCP server is registered, the Cursor Composer/agent can call your
-ComfyUI tools with natural language:
+Once connected, the Cursor agent can call your ComfyUI tools:
 
-> *"Generate a photorealistic sunset over a mountain lake, 768×512"*
+> *"List the available workflows"*
 
-> *"Edit ~/images/portrait.png — make the background blurred bokeh, strength 0.6"*
+> *"Generate a photorealistic portrait of an astronaut, 768×512"*
+
+> *"Edit ~/images/draft.png — make the sky a dramatic sunset, strength 0.6"*
 
 > *"Upscale ~/images/draft.png by 4×"*
-
-> *"List available workflows"*
 
 ---
 
@@ -87,55 +108,60 @@ ComfyUI tools with natural language:
 
 | Tool | Description |
 |---|---|
-| `comfy_generate_image` | Text-to-image with style presets |
-| `comfy_edit_image` | Image-to-image editing (img2img) |
-| `comfy_upscale_image` | ESRGAN-based resolution upscaling |
-| `comfy_list_workflows` | List named workflow JSON files |
-| `comfy_run_named_workflow` | Run a saved workflow with optional input overrides |
-| `comfy_list_models` | List checkpoints, LoRAs, and VAEs available in ComfyUI |
-| `comfy_queue_status` | Show queue depth and VRAM usage |
-| `comfy_interrupt` | Cancel the currently running job |
-
-### Style presets for `comfy_generate_image`
-
-| Preset | Best for |
-|---|---|
-| `default` | General purpose |
-| `photorealistic` | Photographs, realistic scenes |
-| `anime` | Anime / manga style |
-| `painting` | Oil paintings, concept art |
-| `cinematic` | Cinematic stills, dramatic lighting |
+| `list_workflows` | Names of JSON templates in `workflows/` |
+| `run_workflow` | Text-to-image via a named template |
+| `edit_image` | Img2img — upload a local file, apply a prompt |
+| `upscale_image` | ESRGAN upscale — upload a local file, scale by N× |
+| `get_job_status` | Poll an async job by `prompt_id` |
 
 ---
 
-## Saving named workflows
+## Adding your own workflows
 
-1. Design a workflow in the ComfyUI web UI.
-2. Export it as **API format JSON** (enable Dev Mode in ComfyUI settings first).
-3. Save it to `mcp_server/saved_workflows/<name>.json`.
-4. Call `comfy_run_named_workflow` with `name="<name>"` from Cursor.
+1. Build and test a workflow in the ComfyUI web UI.
+2. Enable **Dev Mode** in ComfyUI settings.
+3. Export as **API format JSON**.
+4. Add a `__params__` block at the top that maps parameter names to node/field injection points:
 
-You can inject dynamic values at runtime using the `inputs` parameter:
-
+```json
+{
+  "__params__": {
+    "prompt":   { "node": "6", "field": "text" },
+    "width":    { "node": "5", "field": "width" },
+    "height":   { "node": "5", "field": "height" }
+  },
+  "5": { "class_type": "EmptyLatentImage", "inputs": { ... } },
+  "6": { "class_type": "CLIPTextEncode",   "inputs": { ... } }
+}
 ```
-comfy_run_named_workflow(
-    name="my_portrait_workflow",
-    inputs='{"6": {"text": "a smiling astronaut"}}'
-)
-```
+
+5. Save as `workflows/<name>.json`.
+6. Call `run_workflow(name="<name>", prompt="...")` from Cursor.
+
+---
+
+## Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMFY_HOST` | `127.0.0.1` | ComfyUI host |
+| `COMFY_PORT` | `8188` | ComfyUI port |
+| `COMFY_JOB_TIMEOUT` | `300` | Seconds before a queued job times out |
+| `COMFY_UPSCALE_MODEL` | `RealESRGAN_x4plus.pth` | Default ESRGAN model filename |
+| `COMFY_WORKFLOWS_DIR` | `workflows/` (repo root) | Override workflow template location |
 
 ---
 
 ## Development
 
-Run the MCP server directly for testing:
+Run the MCP server directly:
 
 ```bash
-python -m mcp_server.server
+python server/comfy_mcp_server.py
 ```
 
-Inspect tools interactively with the MCP dev UI:
+Inspect tools interactively with the MCP inspector:
 
 ```bash
-mcp dev mcp_server/server.py
+mcp dev server/comfy_mcp_server.py
 ```

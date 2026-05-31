@@ -1,0 +1,72 @@
+{
+  "__params__": {
+    "prompt":          { "node": "6",  "field": "text" },
+    "negative_prompt": { "node": "7",  "field": "text" },
+    "width":           { "node": "5",  "field": "width" },
+    "height":          { "node": "5",  "field": "height" },
+    "seed":            { "node": "3",  "field": "seed" },
+    "steps":           { "node": "3",  "field": "steps" },
+    "cfg":             { "node": "3",  "field": "cfg" },
+    "checkpoint":      { "node": "4",  "field": "ckpt_name" },
+    "sampler":         { "node": "3",  "field": "sampler_name" },
+    "scheduler":       { "node": "3",  "field": "scheduler" }
+  },
+
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 42,
+      "steps": 25,
+      "cfg": 7.0,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1.0,
+      "model":        ["4", 0],
+      "positive":     ["6", 0],
+      "negative":     ["7", 0],
+      "latent_image": ["5", 0]
+    }
+  },
+  "4": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "v1-5-pruned-emaonly.ckpt"
+    }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "beautiful scenery",
+      "clip": ["4", 1]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "ugly, blurry, low quality, watermark",
+      "clip": ["4", 1]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["3", 0],
+      "vae":     ["4", 2]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "comfy_txt2img",
+      "images": ["8", 0]
+    }
+  }
+}
