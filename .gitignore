@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.venv/
+venv/
+mcp_server/saved_workflows/
+*.egg-info/
+dist/
+build/
+.DS_Store
